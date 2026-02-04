@@ -170,7 +170,7 @@ export default {
       }
     }
 
-    if (this.isSelfHosted) {
+    if (this.isSelfHosted && !urlParams.has("invite")) {
       this.currentTab = "login";
     }
 

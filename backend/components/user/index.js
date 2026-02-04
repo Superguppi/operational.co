@@ -12,14 +12,12 @@ import Email from "#services/email/index.js";
 import Session from "#services/session/index.js";
 import Billing from "#services/billing/index.js";
 
-import Stripe from "stripe";
 import { customAlphabet } from "nanoid";
 import ops from "#lib/ops.js";
 import moment from "moment";
 
 const nanoid = customAlphabet("1234567890abcdefghijklmnopqrstuvwxyz", 24);
 
-const stripe = Stripe(`${config.stripe.TEST_SECRET}`);
 
 const component = {
   async switchWorkspace(user, newWorkspace, sid) {
@@ -146,9 +144,6 @@ const component = {
       const newUser = await User.getPie(user.id);
       console.timeEnd("pie");
 
-      await Billing.createCustomer(user, user.primaryWorkspace).catch((err) => {
-        console.log(err);
-      });
 
       // send activation code
       console.time("activation send");
@@ -415,117 +410,10 @@ const component = {
     // Lastly, save this token on the user model
   },
 
-  async createIntent(baseUser) {
-    const workspace = await Workspace.findById(baseUser.primaryWorkspace);
 
-    console.log(workspace);
 
-    let customerId = workspace.customerId;
 
-    const paymentIntent = await stripe.setupIntents.create({
-      customer: customerId,
-      automatic_payment_methods: {
-        enabled: true,
-      },
-    });
 
-    const date = moment().utc().toISOString();
-
-    await Workspace.client.update({
-      where: {
-        id: baseUser.primaryWorkspace,
-      },
-      data: {
-        status: "NORMAL",
-        paymentStartedAt: date,
-        holdAt: null,
-      },
-    });
-
-    console.log(paymentIntent);
-
-    return paymentIntent;
-  },
-
-  async billCustomer() {
-    let customerId = `cus_QHJmGtWfUi83L5`;
-
-    let paymentMethods = await stripe.customers.listPaymentMethods(customerId, {
-      limit: 3,
-    });
-
-    if (!paymentMethods) {
-      return;
-    }
-
-    if (paymentMethods.data.length === 0) {
-      return;
-    }
-
-    let paymentMethod = paymentMethods.data[0];
-
-    const intent = await stripe.paymentIntents.create({
-      amount: 1000,
-      currency: "USD",
-      customer: customerId,
-      confirm: true,
-      off_session: true,
-      payment_method: paymentMethod.id,
-    });
-
-    await this.afterSuccessfullCharge(customerId);
-  },
-
-  async afterSuccessfullCharge() {
-    const workspace = {
-      id: 1,
-      companyName: "Shash7 pty ltd",
-      admin: {
-        email: "shash122tfu@gmail.com",
-      },
-    };
-
-    const invoice = {
-      period_start: `2024-06-12T09:42:58+0000`,
-      period_end: `2024-06-12T09:42:58+0000`,
-      total: 1000,
-      subtotal: 1000,
-      amount_due: 1000,
-      number: 1,
-    };
-
-    await Pdf.createInvoice(workspace, invoice);
-  },
-
-  async getBillingData(user) {
-    let workspace = await Workspace.findById(user.primaryWorkspace);
-
-    let customerId = workspace.customerId;
-
-    if (!customerId) {
-      const customer = await Billing.createCustomer(user, workspace.id);
-      customerId = customer.id;
-    }
-
-    let setupIntents = await Billing.getSetupIntents(workspace.customerId);
-    let paymentMethods = await Billing.getPaymentMethods(workspace.customerId);
-
-    return { setupIntents, paymentMethods };
-  },
-
-  async cancelSubscription(user) {
-    let workspace = await Workspace.findById(user.primaryWorkspace);
-
-    // Cancel all setupIntents - we won't be able to charge their card again after this
-    await Billing.cancelSetupIntents(workspace.customerId);
-
-    // Mark them as deactivated
-    let date = moment().utc().toISOString();
-    await Workspace.update({
-      id: workspace.id,
-      paymentStoppedAt: date,
-    });
-  },
 
   async setup(form) {
     if (!form) {

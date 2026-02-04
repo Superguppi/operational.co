@@ -7,6 +7,8 @@ import middlewareAccess from "#components/middleware/access.js";
 import model from "./model.js";
 import Storage from "#services/storage/index.js";
 
+import prisma from "#lib/prisma.js";
+import hashPassword from "#lib/hash-password.js";
 import multer from "multer";
 import path from "path";
 import accessCheck from "#lib/access-check.js";
@@ -236,47 +238,8 @@ const updateEmail = async (req, res) => {
   });
 };
 
-const createIntent = async (req, res) => {
-  try {
-    const data = await component.createIntent(res.locals.user);
-    return res.status(201).send(data);
-  } catch (err) {
-    console.log(err);
-    return res.status(401).send({
-      message: err,
-    });
-  }
-};
 
-const getBillingData = async (req, res) => {
-  try {
-    const billingData = await component.getBillingData(res.locals.user);
-    if (billingData) {
-      return res.status(200).send(billingData);
-    } else {
-      return res.status(401).send({
-        message: `No customerId`,
-      });
-    }
-  } catch (err) {
-    console.log(err);
-    return res.status(401).send({
-      message: err,
-    });
-  }
-};
 
-const cancelSubscription = async (req, res) => {
-  try {
-    const setupIntents = await component.cancelSubscription(res.locals.user);
-    return res.status(200).send(setupIntents);
-  } catch (err) {
-    console.log(err);
-    return res.status(401).send({
-      message: err,
-    });
-  }
-};
 
 const demoLogin = async (req, res) => {
   let data = null;
@@ -316,6 +279,63 @@ const setup = async (req, res) => {
   return res.send({
     ...data.user,
   });
+};
+
+const resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    return res.status(400).send({ message: "Token and password required" });
+  }
+  try {
+    const user = await prisma.user.findFirst({ where: { resetPasswordToken: token } });
+    if (!user) {
+      return res.status(400).send({ message: "Invalid or expired token" });
+    }
+    const hashedPassword = await hashPassword(password);
+    const updateData = { password: hashedPassword, resetPasswordToken: null };
+
+    // If user is INVITED, accept their invite automatically
+    if (user.status === "INVITED") {
+      const invite = await prisma.invite.findFirst({ where: { userId: user.id } });
+      if (invite) {
+        updateData.status = "NORMAL";
+        updateData.activated = true;
+        updateData.primaryWorkspace = invite.workspaceId;
+
+        // Ensure WorkspaceUser link exists
+        await prisma.workspaceUser.upsert({
+          where: { userId_workspaceId: { userId: user.id, workspaceId: invite.workspaceId } },
+          create: { userId: user.id, workspaceId: invite.workspaceId },
+          update: {}
+        });
+
+        // Delete the consumed invite
+        await prisma.invite.delete({ where: { id: invite.id } });
+        console.log(`Invite accepted for user ${user.id} via password reset`);
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: updateData
+    });
+
+    const inviteAccepted = updateData.status === "NORMAL";
+    return res.status(200).send({ message: "ok", inviteAccepted });
+  } catch (err) {
+    console.log(err);
+    return res.status(400).send({ message: err.message || err });
+  }
+};
+
+const resetPasswordRequest = async (req, res) => {
+  try {
+    await component.resetPasswordRequest(req.body);
+    return res.status(200).send({ message: "ok" });
+  } catch (err) {
+    console.log(err);
+    return res.status(400).send({ message: err });
+  }
 };
 
 const loginSchema = {
@@ -415,12 +435,10 @@ router.put("/password", middlewareAuth, middlewareSchema(updatePasswordSchema), 
 router.put("/email", middlewareAuth, middlewareSchema(updateEmailSchema), updateEmail);
 router.put("/", middlewareAuth, upload.single("avatar"), middlewareSchema(updateSchema), update);
 
-// Billing routes
-router.post("/create-intent", middlewareAuth, createIntent);
-router.post("/get-billing-data", middlewareAuth, getBillingData);
-router.post("/cancel-subscription", middlewareAuth, cancelSubscription);
 
 router.post("/switch-workspace/:id", middlewareAuth, switchWorkspace);
+router.post("/reset-password", resetPassword);
+router.post("/reset-password-request", resetPasswordRequest);
 router.post("/logout", middlewareAuth, logout);
 
 // Export the router

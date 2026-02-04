@@ -43,17 +43,9 @@ const api = {
     }
   },
 
-  identifyUser: function (user) {
-    if (window.posthog) {
-      posthog.identify(user.id, { email: user.email, name: `${user.firstName} ${user.lastName}` });
-    }
-  },
+  identifyUser: function (user) {},
 
-  reset: function (user) {
-    if (window.posthog) {
-      posthog.reset();
-    }
-  },
+  reset: function (user) {},
 
   signup: async function (form = {}) {
     try {
@@ -82,10 +74,6 @@ const api = {
 
     try {
       const res = await http.post("/user/logout");
-
-      if (typeof $crisp !== "undefined") {
-        $crisp.push(["do", "chat:hide"]);
-      }
 
       this.reset();
 

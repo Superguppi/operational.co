@@ -39,8 +39,9 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
-# Inject VITE_API_URL into index.html (inline JS)
+# Inject VITE_API_URL into index.html (idempotent)
 echo "🛠 Injecting VITE_API_URL and VITE_PUSH_SERVER_KEY directly into index.html..."
+sed -i "/__APP_CONFIG__/d" "$FRONTEND_INDEX"
 sed -i '/<head>/a \
 <script>window.__APP_CONFIG__ = { VITE_API_URL: "'"$VITE_API_URL"'", VITE_PUSH_SERVER_KEY: "'"$VITE_PUSH_SERVER_KEY"'" };</script>' "$FRONTEND_INDEX"
 

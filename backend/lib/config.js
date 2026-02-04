@@ -86,14 +86,6 @@ const config = {
     INVITATION_DURATION: 7,
   },
 
-  resend: {
-    TOKEN: process.env.RESEND,
-  },
-
-  loops: {
-    TOKEN: process.env.LOOPS,
-  },
-
   operational: {
     TOKEN: process.env.OPERATIONAL,
     BASEURL: process.env.OPERATIONAL_BASEURL,
@@ -108,13 +100,6 @@ const config = {
     SMTP_PASSWORD: process.env.SMTP_PASSWORD,
   },
 
-  stripe: {
-    TEST_KEY: process.env.STRIPE_TEST_KEY,
-    TEST_SECRET: process.env.STRIPE_TEST_SECRET,
-
-    LIVE_KEY: process.env.STRIPE_LIVE_KEY,
-    LIVE_SECRET: process.env.STRIPE_LIVE_SECRET,
-  },
 
   vapid: {
     EMAIL: process.env.VAPID_EMAIL,

@@ -64,7 +64,7 @@ const component = {
 
       // 2. Generate invite code + link
       const code = nanoid();
-      const link = `${config.appUrl}?invite=${code}`;
+      const link = `${config.appUrl.replace(/\/$/, "")}/?invite=${code}`;
 
       // 3. Try to find existing user by email
       const existing = await prisma.user.findMany({

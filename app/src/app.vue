@@ -81,7 +81,6 @@ import { setTestMode } from "@/lib/http.js";
 
 import UAParser from "@/lib/ua-parser.js";
 
-import posthog from "posthog-js";
 
 export default {
   components: {
@@ -534,21 +533,6 @@ export default {
   },
 
   mounted: function () {
-    if (typeof $crisp !== "undefined") {
-      $crisp.push(["do", "chat:hide"]);
-    }
-
-    const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
-
-    if (posthogKey) {
-      // posthog.init(posthogKey, {
-      //   api_host: "https://us.i.posthog.com",
-      //   person_profiles: "identified_only", // or 'always' to create profiles for anonymous users as well
-      // });
-
-      window.posthog = posthog;
-    }
-
     this.checkConnection()
       .then(() => this.init())
       .then(() => {

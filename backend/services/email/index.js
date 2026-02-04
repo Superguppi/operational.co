@@ -2,13 +2,11 @@ import config from "#lib/config.js";
 import { Eta } from "eta";
 import path from "path";
 import mjml2html from "mjml";
-import { Resend } from "resend";
 import prisma from "#lib/prisma.js";
 import fs from "fs";
 import moment from "moment";
 import { customAlphabet } from "nanoid";
 import nodemailer from "nodemailer";
-import { LoopsClient, APIError } from "loops";
 
 const alphabet = "abcdefghijklmnopqrstuvwxyz"; // Your custom letters
 const generateId = customAlphabet(alphabet, 4); // Generate 4-character IDs
@@ -25,19 +23,11 @@ class Email {
   devGroup = config.email.devGroup || [];
   managementGroup = config.email.managementGroup || [];
   email = null;
-  resend = null;
   transporter = null;
 
   async setup() {
-    // setup via resend directly
-    if (config.resend.TOKEN && config.email.FROM) {
-      const resend = new Resend(config.resend.TOKEN);
-
-      this.resend = resend;
-      console.log("sending email via resend");
-
-      // or if available, setup via smtp
-    } else if (config.email.SMTP_HOST) {
+    // setup via smtp
+    if (config.email.SMTP_HOST) {
       let opts = {
         host: config.email.SMTP_HOST,
         port: config.email.SMTP_PORT || 587,
@@ -60,27 +50,9 @@ class Email {
   }
 
   async test() {
-    let value = "file";
-    let info = "";
-
-    if (config.resend.TOKEN && config.email.FROM) {
-      value = "resend";
-    }
-    if (config.resend.TOKEN && !config.email.FROM) {
-      value = "file";
-      info = "FROM env var needs to be set to receive emails from RESEND";
-    }
-    if (!config.resend.TOKEN) {
-      value = "file";
-      info = "Resend setup not found. Emails will be written as text files inside /backend/private";
-    }
-
-    return {
-      name: "email",
-      value: value,
-      status: "active",
-      info: info,
-    };
+    let value = this.transporter ? "smtp" : "file";
+    let info = this.transporter ? "" : "No SMTP configured. Emails will be written as text files.";
+    return { name: "email", value, status: "active", info };
   }
 
   async sendTest(email) {
@@ -148,22 +120,7 @@ class Email {
 
     let response = null;
 
-    if (this.resend) {
-      try {
-        response = await this.resend.emails.send(payload);
-
-        delete payload.attachments;
-        delete payload.html;
-
-        let str = JSON.stringify(payload);
-
-        //console.log(str);
-      } catch (err) {
-        console.log(err);
-
-        throw err;
-      }
-    } else if (this.transporter) {
+    if (this.transporter) {
       try {
         const info = await this.transporter.sendMail({
           from: `Operational <${payload.from}>`, // sender address
@@ -249,7 +206,7 @@ class Email {
 
     let baseUrl = config.appUrl;
 
-    let link = `${baseUrl}/?resetpasswordtoken=${user.resetPasswordToken}`;
+    let link = `${baseUrl}/reset-password?token=${user.resetPasswordToken}`;
 
     let text = `
       Hi ${user.firstName},
